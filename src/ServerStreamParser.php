@@ -49,11 +49,11 @@ class ServerStreamParser extends StreamParser {
         return $this->serializer->decode($msg);
     }
 
-    public function setClient(AbstractClient $client):self{
+    public function setClient(ClientInterface $client):self{
         $this->client=$client;
         return $this;
     }
-    public function getClient():AbstractClient{
+    public function getClient():ClientInterface{
         return $this->client;
     }
 
