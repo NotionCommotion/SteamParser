@@ -1,0 +1,5 @@
+{
+    "require": {
+        "notioncommotion/stream-parser": "^1.0"
+    }
+}
