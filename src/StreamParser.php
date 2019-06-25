@@ -41,6 +41,9 @@ class StreamParser extends EventEmitter implements DuplexStreamInterface {
         if ($err=array_diff(array_keys($options), ['logMessages', 'summaryStreamLog', 'rawReadStreamLog', 'rawWriteStreamLog', 'maxMessageLength','maxReadBufferLength'])) {
             throw new \InvalidArgumentException('Invalid options: '.implode(', ', $err));
         }
+        if(isset($options['logMessages'])) {
+            $options['logMessages']==-1?null:(int) $options['logMessages'];
+        }
         foreach($options as $option=>$value) {
             $this->$option=$value;
         }
