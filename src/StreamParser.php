@@ -42,7 +42,7 @@ class StreamParser extends EventEmitter implements DuplexStreamInterface {
             throw new \InvalidArgumentException('Invalid options: '.implode(', ', $err));
         }
         if(isset($options['logMessages'])) {
-            $options['logMessages']==-1?null:(int) $options['logMessages'];
+            $options['logMessages']=$options['logMessages']==-1?null:(int) $options['logMessages'];
         }
         foreach($options as $option=>$value) {
             $this->$option=$value;
