@@ -49,6 +49,11 @@ class ServerStreamParser extends StreamParser {
         return $this->serializer->decode($msg);
     }
 
+    /*public function write($data) {
+        syslog(LOG_INFO, 'write debug client: '.json_encode($this->client->debug()));
+        return parent::write($data);
+    }*/
+
     public function setClient(ClientInterface $client):self{
         $this->client=$client;
         return $this;

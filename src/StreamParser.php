@@ -18,10 +18,11 @@ class StreamParser extends EventEmitter implements DuplexStreamInterface {
     $summaryStreamLog,          //Log file location to log summary messages along with binary
     $rawReadStreamLog,          //Log file location to log raw hex read messages (will be deleted upon start)
     $rawWriteStreamLog,
+    $maxWriteChunkLength=2000,      //Will break in parts
     $maxMessageLength=65535,
-    $maxWriteBufferLength=255,  //Maximum length of the write buffer (array).
+    $maxWriteBufferLength=16777215, //Maximum length of the write buffer
 
-    $writeBuffer=[],            //internally used
+    $writeBuffer,               //internally used
     $timestamp;                 //When initiated
 
     protected
@@ -74,55 +75,65 @@ class StreamParser extends EventEmitter implements DuplexStreamInterface {
     * @param mixed $data
     */
     public function write($data) {
-        if($this->stream) {
-            if($this->stream->isWritable()) {
-                if (strlen($data) > $this->maxMessageLength) {
-                    $this->handleError(new \OverflowException('Write message size exceeded'));
-                }
-                $package=$this->encoder->pack($data);
-                if($this->summaryStreamLog) {
-                    try{
-                        $this->logSummaryStream('write', json_encode($this->decode($data)), $package);
-                    }
-                    catch(\Exception $e) {
-                        $this->handleError($e);
-                    }
-                }
-                $this->debug('write strlen: '.strlen($package));
-                if($this->rawWriteStreamLog) {
-                    //Or base64_encode() which uses less space and can compare whole values easily, but requires decoding to do detailed comparisons.
-                    file_put_contents($this->rawWriteStreamLog, bin2hex($package),  FILE_APPEND);
-                }
-                if(!$this->stream->write($package)) {
-                    $this->debug('StreamParser::write() reactphp buffer - strlen: '.strlen($package), LOG_ERR);
-                }
-                return true;
+         if($this->stream && $this->stream->isWritable()) {
+            if (strlen($data) > $this->maxMessageLength) {
+                $this->handleError(new \OverflowException('Write message size exceeded'));
             }
-            else {
-                $this->debug('StreamParser::write() StreamParser buffer - strlen:' .strlen($data), LOG_ERR);
-                $this->writeBuffer[]=$data;
-                if (count($this->writeBuffer) > $this->maxWriteBufferLength) {
-                    $this->handleError(new \OverflowException('Write buffer size exceeded'));
+            $package=$this->encoder->pack($data);
+            if($this->summaryStreamLog) {
+                try{
+                    $this->logSummaryStream('write', json_encode($this->decode($data)), $package);
                 }
+                catch(\Exception $e) {
+                    $this->handleError($e);
+                }
+            }
+            $this->writeBuffer.=$package;
+            if (strlen($this->writeBuffer) > $this->maxWriteBufferLength) {
+                $this->handleError(new \OverflowException('Write buffer size exceeded'));
+            }
+            //Tecnically, this is not necessarly being sent to the stream.  Maybe move to _write()?
+            $this->debug('write strlen: '.strlen($package));
+            if($this->rawWriteStreamLog) {
+                //Or base64_encode() which uses less space and can compare whole values easily, but requires decoding to do detailed comparisons.
+                file_put_contents($this->rawWriteStreamLog, bin2hex($package),  FILE_APPEND);
+            }
+            return $this->_write();
+
+            if($this->writeBuffer) {
+                $this->debug('StreamParser::write() Buffer still accepting data', LOG_ERR);
                 return false;
             }
+            else {
+                return true;
+            }
+
         }
         throw new \RuntimeException('Attempting to write to a non-writable stream');
     }
 
+    private function _write():bool {
+        while ($chunk=substr($this->writeBuffer, 0, $this->maxWriteChunkLength)) {
+            $this->debug('attempting to write string of length: '.strlen($chunk));
+            if($this->stream->write($chunk)) {
+                $this->writeBuffer=substr($this->writeBuffer, strlen($chunk));
+                if(!$this->writeBuffer) {
+                    return true;
+                }
+            }
+            else {
+                $this->debug('Write stream not accepting data', LOG_ERR);
+                return false;
+            }
+        }
+        return true;    //Exact length?
+    }
+
     /** @internal */
     public function handleDrain() {
-        $i=0;
-        while($this->writeBuffer) {
-            if(!$this->write($this->writeBuffer[$i])) {
-                //Return to original buffer position.
-                $this->writeBuffer[0]=array_pop($this->writeBuffer);
-                break;
-            }
-            $i++;
-        }
-        $this->writeBuffer=array_values($this->writeBuffer);
+        $this->debug('handleDrain');
         $this->emit('drain');
+        $this->_write();
     }
 
     /** @internal */
