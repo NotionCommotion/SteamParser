@@ -10,7 +10,7 @@
     ],
     "require": {
         "php": ">=7.2",
-        "notioncommotion/cborencode2": "1.0.0",
+        "2tvenom/cborencode": "1.0.0",
         "react/socket": "^1.2.1",
         "react/stream": "^1.0",
         "react/event-loop": "^1.1"
